@@ -2,7 +2,7 @@
 
 # Replace this with the name of your wireless interface
 INTERFACE="wlp4s0f4u1"
-TYPE="managed"
+TYPE="monitor"
 
 echo "[*] Stopping network services that may lock the interface..."
 sudo systemctl stop NetworkManager

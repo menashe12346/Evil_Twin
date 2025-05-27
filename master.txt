@@ -1,0 +1,11 @@
+
+evil_twin on  master [!?] 
+✦ ❯ sudo ip link set wlp4s0f4u1 down
+
+
+evil_twin on  master [!?] 
+✦ ❯ sudo iw dev wlp4s0f4u1 set type __ap
+
+
+evil_twin on  master [!?] 
+✦ ❯ sudo ip link set wlp4s0f4u1 up
