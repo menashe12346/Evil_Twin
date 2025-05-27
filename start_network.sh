@@ -40,7 +40,7 @@ cleanup() {
 }
 
 # Trap Ctrl+C, kill, background stop, and exit
-trap cleanup SIGINT SIGTERM SIGTSTP EXIT
+trap cleanup SIGINT SIGTERM SIGTSTP
 
 echo "🚀 Starting hostapd in background with config: $CONFIG"
 hostapd "$CONFIG" &

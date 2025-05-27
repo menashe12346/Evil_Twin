@@ -3,23 +3,26 @@ import subprocess
 import os
 
 # הגדרות כלליות
-INTERFACE = "wlp4s0f4u1"   # ממשק ה־WiFi ב־AP Mode
-INTERNET_IFACE = "wlp2s0"    # ממשק שמוביל לאינטרנט (שנה ל־wlan0 אם צריך)
+INTERFACE = "wlp4s0f4u1"   # ממשק ה־WiFi ב־AP Mode (AP)
+INTERNET_IFACE = "wlp2s0"  # ממשק שמוביל לאינטרנט
 OFFERED_IP = "192.168.1.100"
 SERVER_IP = "192.168.1.1"
 SUBNET_MASK = "255.255.255.0"
 LEASE_TIME = 3600
 
-# ניהול sessions לפי MAC
 session_store = {}
 
-# בדיקת root
 def check_root():
     if os.geteuid() != 0:
         print("[!] Must run as root. Use sudo.")
         exit(1)
 
-# הפעלת IP forwarding אם לא פעיל
+def assign_ip_to_ap():
+    print(f"[*] Assigning {SERVER_IP}/24 to {INTERFACE}...")
+    subprocess.run(["ip", "addr", "flush", "dev", INTERFACE])
+    subprocess.run(["ip", "addr", "add", f"{SERVER_IP}/24", "dev", INTERFACE], check=True)
+    subprocess.run(["ip", "link", "set", INTERFACE, "up"], check=True)
+
 def enable_ip_forwarding():
     with open("/proc/sys/net/ipv4/ip_forward", "r") as f:
         status = f.read().strip()
@@ -29,14 +32,13 @@ def enable_ip_forwarding():
     else:
         print("[*] IP forwarding already enabled.")
 
-# הפעלת NAT אם לא פעיל כבר
 def enable_nat():
-    check_rule = subprocess.run(
+    result = subprocess.run(
         ["iptables", "-t", "nat", "-C", "POSTROUTING", "-o", INTERNET_IFACE, "-j", "MASQUERADE"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )
-    if check_rule.returncode != 0:
+    if result.returncode != 0:
         print(f"[*] Enabling NAT on {INTERNET_IFACE}...")
         subprocess.run(
             ["iptables", "-t", "nat", "-A", "POSTROUTING", "-o", INTERNET_IFACE, "-j", "MASQUERADE"],
@@ -45,7 +47,39 @@ def enable_nat():
     else:
         print("[*] NAT already enabled.")
 
-# זיהוי בקשת DHCP
+def enable_forwarding_rules():
+    # כלל: מ-AP החוצה
+    fwd_out = subprocess.run(
+        ["iptables", "-C", "FORWARD", "-i", INTERFACE, "-o", INTERNET_IFACE, "-j", "ACCEPT"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    if fwd_out.returncode != 0:
+        print(f"[*] Allowing FORWARD from {INTERFACE} to {INTERNET_IFACE}...")
+        subprocess.run(
+            ["iptables", "-A", "FORWARD", "-i", INTERFACE, "-o", INTERNET_IFACE, "-j", "ACCEPT"],
+            check=True
+        )
+    else:
+        print("[*] Forward rule from AP to Internet already exists.")
+
+    # כלל: תגובות חזרה מהאינטרנט
+    fwd_in = subprocess.run(
+        ["iptables", "-C", "FORWARD", "-i", INTERNET_IFACE, "-o", INTERFACE,
+         "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    if fwd_in.returncode != 0:
+        print(f"[*] Allowing FORWARD from {INTERNET_IFACE} to {INTERFACE} (responses)...")
+        subprocess.run(
+            ["iptables", "-A", "FORWARD", "-i", INTERNET_IFACE, "-o", INTERFACE,
+             "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"],
+            check=True
+        )
+    else:
+        print("[*] Reverse forward rule already exists.")
+
 def handle_dhcp(pkt):
     if not pkt.haslayer(DHCP):
         return
@@ -71,7 +105,6 @@ def handle_dhcp(pkt):
         print(f"[+] DHCPREQUEST from {mac}, xid={xid}")
         send_response(mac, xid, chaddr, msg_type="ack")
 
-# שליחת OFFER / ACK
 def send_response(mac, xid, chaddr, msg_type="offer"):
     ether = Ether(dst=mac, src=get_if_hwaddr(INTERFACE))
     ip = IP(src=SERVER_IP, dst="255.255.255.255")
@@ -90,11 +123,12 @@ def send_response(mac, xid, chaddr, msg_type="offer"):
     sendp(packet, iface=INTERFACE, verbose=0)
     print(f"[>] Sent DHCP {msg_type.upper()} to {mac}")
 
-# פונקציית main
 def main():
     check_root()
+    assign_ip_to_ap()
     enable_ip_forwarding()
     enable_nat()
+    enable_forwarding_rules()
     print(f"[*] Listening for DHCP packets on {INTERFACE}...")
     sniff(filter="udp and (port 67 or 68)", iface=INTERFACE, prn=handle_dhcp)
 
