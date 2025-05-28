@@ -1,25 +1,36 @@
 #!/bin/bash
 
-# Replace this with the name of your wireless interface
 INTERFACE="wlp4s0f4u1"
-TYPE="monitor"
 
-echo "[*] Stopping network services that may lock the interface..."
-sudo systemctl stop NetworkManager
-sudo systemctl stop wpa_supplicant
+enable_monitor_mode() {
 
-echo "[*] Bringing down interface $INTERFACE..."
-sudo ip link set $INTERFACE down
+    if [[ -z "$INTERFACE" ]]; then
+        echo "❌ Usage: enable_monitor_mode <interface>"
+        exit 1
+    fi
 
-echo "[*] Setting interface to $TYPE mode..."
-sudo iw dev $INTERFACE set type $TYPE || sudo iwconfig $INTERFACE mode $TYPE
+    echo "[*] Stopping interfering network services..."
+    systemctl stop NetworkManager
+    systemctl stop wpa_supplicant
 
-echo "[*] Bringing the interface back up..."
-sudo ip link set $INTERFACE up
-sudo systemctl start NetworkManager
-sudo systemctl start wpa_supplicant
+    echo "[*] Bringing down interface $INTERFACE..."
+    ip link set "$INTERFACE" down
 
-echo "[*] Current interface mode:"
-iwconfig $INTERFACE
+    echo "[*] Setting $INTERFACE to monitor mode..."
+    iw dev "$INTERFACE" set type monitor || iwconfig "$INTERFACE" mode monitor
 
-echo "[✓] Done. Verify that mode is '$TYPE'."
+    echo "[*] Bringing up interface $INTERFACE..."
+    ip link set "$INTERFACE" up
+
+    echo "[*] Bringing up interfering network services..."
+    systemctl start NetworkManager
+    systemctl start wpa_supplicant
+
+    echo "[*] Current interface status:"
+    iwconfig "$INTERFACE"
+
+    echo "[✓] $INTERFACE is now in monitor mode."
+}
+
+# Entry point
+enable_monitor_mode "$1"

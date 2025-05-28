@@ -1,0 +1,33 @@
+
+evil_twin on  master [!?] via 🐍 v3.8.12 
+✦ ❯ python3 -m venv env
+
+evil_twin on  master [!?] via 🐍 v3.8.12 took 2s 
+✦ ❯ source env/bin/activate
+env/bin/activate (line 40): Unsupported use of '='. In fish, please use 'set VIRTUAL_ENV "/home/menashe/evil_twin/env"'.
+VIRTUAL_ENV="/home/menashe/evil_twin/env"
+^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+from sourcing file env/bin/activate
+source: Error while reading file 'env/bin/activate'
+
+evil_twin on  master [!?] via 🐍 v3.8.12 
+✦ ❯ source env/bin/activate.fish
+
+
+evil_twin on  master [!?] via 🐍 v3.8.12 (env) 
+✦ ❯ pip install dnslib
+
+Collecting dnslib
+  Downloading dnslib-0.9.26-py3-none-any.whl (64 kB)
+     |████████████████████████████████| 64 kB 950 kB/s 
+Installing collected packages: dnslib
+Successfully installed dnslib-0.9.26
+WARNING: You are using pip version 21.1.1; however, version 25.0.1 is available.
+You should consider upgrading via the '/home/menashe/evil_twin/env/bin/python3 -m pip install --upgrade pip' command.
+
+evil_twin on  master [!?] via 🐍 v3.8.12 (env) 
+✦ ❯ sudo env/bin/python dns_spoofing.py
+
+
+
+sudo env/bin/python dns_spoofing.py
