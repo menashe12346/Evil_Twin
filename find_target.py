@@ -2,20 +2,55 @@ from scapy.all import *
 from collections import defaultdict
 from tabulate import tabulate
 from manuf import manuf
+import subprocess
+import threading
+import time
+import os
+
+def channel_hopper(interface, dwell=0.5, stop_event=None):
+    """
+    Changes the Wi-Fi channel every `dwell` seconds.
+    If stop_event is provided, will exit when stop_event.is_set().
+    """
+    if not isinstance(dwell, (int, float)):
+        raise TypeError(f"dwell must be a number, got {type(dwell)}")
+
+    channels = {
+        "2.4GHz": list(range(1, 15)),
+        "5GHz": [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112,
+                 116, 120, 124, 128, 132, 136, 140, 144, 149, 153,
+                 157, 161, 165],
+        "6GHz": [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49,
+                 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97,
+                 101, 105, 109, 113, 117, 121, 125, 129, 133, 137,
+                 141, 145, 149, 153, 157, 161, 165, 169, 173, 177]
+    }
+
+    def hop():
+        print("[*] Starting channel hopping…")
+        while stop_event is None or not stop_event.is_set():
+            for ch_list in channels.values():
+                for ch in ch_list:
+                    os.system(f"iw dev {interface} set channel {ch} > /dev/null 2>&1")
+                    time.sleep(dwell)
+                    if stop_event and stop_event.is_set():
+                        print("[*] Channel hopping stopped")
+                        return
+
+    t = threading.Thread(target=hop, daemon=True)
+    t.start()
+    return t
 
 def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
-    access_points = {}  # BSSID -> info
-    clients = defaultdict(dict)  # BSSID -> MAC -> info
+    access_points = {}
+    clients = defaultdict(dict)
     parser = manuf.MacParser()
 
     def packet_handler(pkt):
         if pkt.haslayer(Dot11):
-            # Access point detection
-            if pkt.type == 0 and pkt.subtype in [8, 5]:  # Beacon / ProbeResp
+            if pkt.type == 0 and pkt.subtype in [8, 5]:
                 bssid = pkt[Dot11].addr2
                 ssid = pkt[Dot11Elt].info.decode(errors="ignore") if pkt.haslayer(Dot11Elt) else "<Hidden>"
-
-                # Channel
                 channel = None
                 elt = pkt.getlayer(Dot11Elt)
                 while elt:
@@ -23,7 +58,6 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
                         channel = elt.info[0]
                         break
                     elt = elt.payload.getlayer(Dot11Elt)
-
                 power = pkt.dBm_AntSignal if hasattr(pkt, 'dBm_AntSignal') else 0
 
                 access_points[bssid] = {
@@ -35,7 +69,6 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
                     "AUTH": "PSK"
                 }
 
-            # Client detection
             if pkt.type == 2 or (pkt.type == 0 and pkt.subtype == 4):
                 addr1 = pkt.addr1
                 addr2 = pkt.addr2
@@ -51,11 +84,19 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
                                 "Vendor": vendor
                             }
 
-    print("[*] Scanning Wi-Fi networks... Press Ctrl+C to stop.\n")
+    print("[*] Starting channel hopping...")
+    # start the internal hopper thread and keep its stop_event
+    stop_event = threading.Event()
+    hopper_thread = channel_hopper(iface, dwell=0.5, stop_event=stop_event)
+
+    print("[*] Scanning Wi-Fi networks...\n")
     try:
         sniff(prn=packet_handler, iface=iface, timeout=timeout)
     except KeyboardInterrupt:
         pass
+
+    stop_event.set()
+    hopper_thread.join()
 
     # Display networks
     table = []
@@ -85,7 +126,7 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
         selected_bssid = indexed_bssids[choice]
     except (ValueError, IndexError):
         print("❌ Invalid network selection.")
-        return None, None
+        return None, None, None
 
     # Display clients
     selected_clients = list(clients[selected_bssid].values())
@@ -103,16 +144,14 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
     print(f"\n📡 Clients connected to {selected_bssid} ({access_points[selected_bssid]['SSID']}):")
     print(tabulate(client_table, headers=client_headers, tablefmt="grid"))
 
-    # Choose client
     try:
         client_choice = int(input("\n👤 Choose client number: "))
         selected_client_mac = selected_clients[client_choice]["MAC"]
     except (ValueError, IndexError):
         print("❌ Invalid client selection.")
-        return selected_bssid, None
-    
-    selected_ssid = access_points[selected_bssid]['SSID']
+        return selected_bssid, None, None
 
+    selected_ssid = access_points[selected_bssid]['SSID']
     return selected_bssid, selected_ssid, selected_client_mac
 
 if __name__ == "__main__":
