@@ -38,7 +38,6 @@ evil_twin/
 ├── defense/
 │   └── identify_evil_twin_attack.py # Real-time Evil Twin detection scanner
 │
-├── env/                             # (optional) Python virtual environment
 ├── requirements.txt                 # Python dependencies
 └── README.md
 ```
@@ -52,20 +51,11 @@ evil_twin/
 - Wi-Fi adapter that supports:
   - Monitor mode
   - AP mode
-  - Packet injection
 - `hostapd` installed and accessible in PATH
-- Recommended: `airmon-ng`, `iw`, `macchanger`
 
 ### 🐍 Python libraries:
 ```bash
 pip install -r requirements.txt
-```
-
-`requirements.txt` includes:
-```
-scapy
-tabulate
-manuf
 ```
 
 ---
@@ -82,7 +72,7 @@ manuf
 
 ```bash
 cd attack
-sudo python3 start_attack.py
+sudo python start_attack.py
 ```
 
 This will:
@@ -105,7 +95,7 @@ This will:
 
 ```bash
 cd defense
-sudo python3 identify_evil_twin_attack.py
+sudo python identify_evil_twin_attack.py
 ```
 
 You will see real-time alerts if Evil Twin behavior is detected.

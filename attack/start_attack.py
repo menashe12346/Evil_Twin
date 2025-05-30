@@ -11,9 +11,9 @@ import sys
 
 ADAPTER_INTERFACE = "wlp4s0f4u1"
 MY_INTERFACE = "wlp2s0"
-MONITOR_SCRIPT = "./set_monitor.sh"
-MANAGED_SCRIPT = "./set_managed.sh"
-MASTER_SCRIPT = "./set_master.sh"
+MONITOR_SCRIPT = "../change_interface_mode/set_monitor.sh"
+MANAGED_SCRIPT = "../change_interface_mode/set_managed.sh"
+MASTER_SCRIPT = "../change_interface_mode/set_master.sh"
 HOSTAPD_SCRIPT = "./start_network.sh"
 
 def wait_for_enter():

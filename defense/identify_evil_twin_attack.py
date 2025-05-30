@@ -7,8 +7,8 @@ INTERFACE = "wlp4s0f4u1"
 SCAN_INTERVAL = 20  # seconds
 
 def set_monitor_mode(interface):
-    print(f"[*] Enabling monitor mode  on interface {interface} using ./set_monitor.sh...")
-    subprocess.run(["./set_monitor.sh", interface], check=True)
+    print(f"[*] Enabling monitor mode  on interface {interface} using ../change_interface_mode/set_monitor.sh...")
+    subprocess.run(["../change_interface_mode/set_monitor.sh", interface], check=True)
 
 def scan_wifi(interface, timeout=30):
     networks = {}
