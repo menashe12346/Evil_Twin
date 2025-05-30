@@ -27,7 +27,6 @@ def channel_hopper(interface, dwell=0.5, stop_event=None):
     }
 
     def hop():
-        print("[*] Starting channel hopping…")
         while stop_event is None or not stop_event.is_set():
             for ch_list in channels.values():
                 for ch in ch_list:
@@ -41,10 +40,20 @@ def channel_hopper(interface, dwell=0.5, stop_event=None):
     t.start()
     return t
 
-def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
+def scan_wifi_networks(iface, timeout=100):
     access_points = {}
     clients = defaultdict(dict)
     parser = manuf.MacParser()
+
+    def countdown(seconds, stop_event):
+        """מדפיס כל שניה כמה שניות נותרו לסיום הסריקה"""
+        for remaining in range(seconds, 0, -1):
+            if stop_event.is_set():
+                break
+            print(f"\r⏱  Scanning... {remaining:3d}s remaining", end='', flush=True)
+            time.sleep(1)
+        print("\r⏱  Scanning... done!")
+
 
     def packet_handler(pkt):
         if pkt.haslayer(Dot11):
@@ -90,6 +99,10 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
     hopper_thread = channel_hopper(iface, dwell=0.5, stop_event=stop_event)
 
     print("[*] Scanning Wi-Fi networks...\n")
+    # השקת תצוגת הספירה לאחור
+    timer_thread = threading.Thread(target=countdown, args=(timeout, stop_event), daemon=True)
+    timer_thread.start()
+   
     try:
         sniff(prn=packet_handler, iface=iface, timeout=timeout)
     except KeyboardInterrupt:
@@ -97,6 +110,8 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
 
     stop_event.set()
     hopper_thread.join()
+    timer_thread.join()
+    print()  # קו ריק אחרי הספירה
 
     # Display networks
     table = []
@@ -122,12 +137,13 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
 
     # Choose network
     try:
-        choice = int(input("\n🔍 Choose network number to view clients: "))
+        choice = int(input("\n🔍 Choose network number to attack: "))
         selected_bssid = indexed_bssids[choice]
     except (ValueError, IndexError):
         print("❌ Invalid network selection.")
         return None, None, None
 
+    """
     # Display clients
     selected_clients = list(clients[selected_bssid].values())
     client_table = []
@@ -150,12 +166,13 @@ def scan_wifi_networks(iface="wlp4s0f4u1", timeout=100):
     except (ValueError, IndexError):
         print("❌ Invalid client selection.")
         return selected_bssid, None, None
+    """
 
     selected_ssid = access_points[selected_bssid]['SSID']
-    return selected_bssid, selected_ssid, selected_client_mac
+    return selected_bssid, selected_ssid
 
 if __name__ == "__main__":
-    bssid, selected_ssid, client_mac = scan_wifi_networks()
+    bssid, selected_ssid = scan_wifi_networks()
     print("✅ Selected BSSID:", bssid)
     print("✅ Selected SSID:", selected_ssid)
-    print("✅ Selected Client MAC:", client_mac)
+    #print("✅ Selected Client MAC:", client_mac)

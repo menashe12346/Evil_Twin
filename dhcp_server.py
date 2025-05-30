@@ -152,7 +152,7 @@ def send_response(mac, xid, chaddr, msg_type="offer"):
     sendp(packet, iface=INTERFACE, verbose=0)
     print(f"[>] Sent DHCP {msg_type.upper()} to {mac}")
 
-def start_captive_portal():
+def start_captive_portal(interface):
     check_root()
     assign_ip_to_ap()
     enable_ip_forwarding()

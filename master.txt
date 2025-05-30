@@ -1,8 +1,0 @@
-
-✦ ❯ sudo ip link set wlp4s0f4u1 down
-
-
-✦ ❯ sudo iw dev wlp4s0f4u1 set type __ap
-
-
-✦ ❯ sudo ip link set wlp4s0f4u1 up

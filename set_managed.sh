@@ -2,10 +2,10 @@
 
 INTERFACE="wlp2s0"
 
-enable_monitor_mode() {
+enable_managed_mode() {
 
     if [[ -z "$INTERFACE" ]]; then
-        echo "❌ Usage: enable_monitor_mode <interface>"
+        echo "❌ Usage: enable_managed_mode <interface>"
         exit 1
     fi
 
@@ -16,8 +16,8 @@ enable_monitor_mode() {
     echo "[*] Bringing down interface $INTERFACE..."
     ip link set "$INTERFACE" down
 
-    echo "[*] Setting $INTERFACE to monitor mode..."
-    iw dev "$INTERFACE" set type monitor || iwconfig "$INTERFACE" mode monitor
+    echo "[*] Setting $INTERFACE to managed mode..."
+    iw dev "$INTERFACE" set type managed || iwconfig "$INTERFACE" mode managed
 
     echo "[*] Bringing up interface $INTERFACE..."
     ip link set "$INTERFACE" up
@@ -29,8 +29,8 @@ enable_monitor_mode() {
     echo "[*] Current interface status:"
     iwconfig "$INTERFACE"
 
-    echo "[✓] $INTERFACE is now in monitor mode."
+    echo "[✓] $INTERFACE is now in managed mode."
 }
 
 # Entry point
-enable_monitor_mode "$1"
+enable_managed_mode "$1"
