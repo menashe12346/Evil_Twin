@@ -40,7 +40,7 @@ def channel_hopper(interface, dwell=0.5, stop_event=None):
     t.start()
     return t
 
-def scan_wifi_networks(iface, timeout=8):
+def scan_wifi_networks(iface, timeout=50):
     access_points = {}
     clients = defaultdict(dict)
     parser = manuf.MacParser()
@@ -78,7 +78,7 @@ def scan_wifi_networks(iface, timeout=8):
                     "AUTH": "PSK"
                 }
 
-            if pkt.type == 2 or (pkt.type == 0 and pkt.subtype == 4):
+            if pkt.type == 2:
                 addr1 = pkt.addr1
                 addr2 = pkt.addr2
                 for ap in access_points:
@@ -92,6 +92,21 @@ def scan_wifi_networks(iface, timeout=8):
                                 "RSSI": signal,
                                 "Vendor": vendor
                             }
+            elif pkt.type == 0 and pkt.subtype == 4:  # Probe Request
+                if pkt.haslayer(Dot11ProbeReq) and pkt.haslayer(Dot11Elt):
+                    ssid = pkt[Dot11Elt].info.decode(errors="ignore")
+                    mac = pkt.addr2
+                    for ap in access_points.values():
+                        if ssid == ap["SSID"]:
+                            if mac not in clients[ap["SSID"]]:
+                                signal = pkt.dBm_AntSignal if hasattr(pkt, 'dBm_AntSignal') else None
+                                vendor = parser.get_manuf(mac) or "Unknown"
+                                clients[ap["SSID"]][mac] = {
+                                    "MAC": mac,
+                                    "RSSI": signal,
+                                    "Vendor": vendor
+                                }
+
 
     print("[*] Starting channel hopping...")
     # start the internal hopper thread and keep its stop_event
@@ -143,7 +158,6 @@ def scan_wifi_networks(iface, timeout=8):
         print("❌ Invalid network selection.")
         return None, None, None
 
-    """
     # Display clients
     selected_clients = list(clients[selected_bssid].values())
     client_table = []
@@ -166,13 +180,12 @@ def scan_wifi_networks(iface, timeout=8):
     except (ValueError, IndexError):
         print("❌ Invalid client selection.")
         return selected_bssid, None, None
-    """
 
     selected_ssid = access_points[selected_bssid]['SSID']
-    return selected_bssid, selected_ssid
+    return selected_bssid, selected_ssid, selected_client_mac
 
 if __name__ == "__main__":
-    bssid, selected_ssid = scan_wifi_networks()
+    bssid, selected_ssid, selected_client_mac = scan_wifi_networks()
     print("✅ Selected BSSID:", bssid)
     print("✅ Selected SSID:", selected_ssid)
-    #print("✅ Selected Client MAC:", client_mac)
+    print("✅ Selected Client MAC:", client_mac)

