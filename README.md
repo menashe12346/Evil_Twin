@@ -12,7 +12,7 @@ This project demonstrates both **offensive** and **defensive** techniques involv
 2. **Evil Twin Defense Tool**:
    - Monitors nearby Wi-Fi networks in real-time.
    - Detects cloned SSIDs with different BSSIDs or signal anomalies.
-   - Alerts the user and can optionally trigger defensive actions.
+   - Alerts the user.
 
 ---
 
@@ -42,14 +42,13 @@ rquriments.txt
 
 ## ⚙️ Requirements
 
-- Linux OS (tested on Arch/Ubuntu)
+- Linux OS (tested on Arch)
 - Python 3.8+
 - Wi-Fi adapter that supports:
   - Monitor mode
+  - AP mode
   - Packet injection
 - `hostapd` installed and accessible
-- Tools:
-  - `Scapy`
 - Python libraries:
   ```bash
   pip install -r requirements.txt
@@ -117,13 +116,13 @@ sudo python3 identify_evil_twin_attack.py
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/yourname/evil_twin.git
+   git clone https://github.com/menashe12346/evil_twin.git
    cd evil_twin
    ```
 
 2. Install dependencies:
    ```bash
-   sudo apt install aircrack-ng hostapd iw net-tools
+   sudo apt install hostapd
    pip install -r requirements.txt
    ```
 
@@ -139,21 +138,5 @@ sudo python3 identify_evil_twin_attack.py
 ## ⚠️ Legal Notice
 
 > ⚠️ **Use responsibly!** This project is for educational purposes and ethical testing in legal environments (e.g., lab, CTF, bug bounty). Do **not** use this toolkit on networks or devices you don't own or have explicit permission to test.
-
----
-
-## 👨‍💻 Author
-
-Created by [Your Name], 2025  
-Inspired by real-world pentesting techniques and Wi-Fi security research.
-
----
-
-## 🌟 Future Ideas
-
-- Integrate with GUI for easier visualization.
-- Auto-block suspicious APs.
-- Logging system for incident history.
-- Integration with WPA handshake sniffer and cracking module.
 
 ---
