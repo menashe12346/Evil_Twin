@@ -1,8 +1,7 @@
 #!/bin/bash
 
-INTERFACE="wlp2s0"
-
 enable_managed_mode() {
+    INTERFACE="$1"
 
     if [[ -z "$INTERFACE" ]]; then
         echo "❌ Usage: enable_managed_mode <interface>"

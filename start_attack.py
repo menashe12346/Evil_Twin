@@ -43,7 +43,7 @@ def enable_master_mode(interface):
         print(f"❌ Failed to enable master mode on {interface}")
         exit(1)
 
-def start_hostapd(interface, ssid):
+def start_hostapd(ssid, interface):
     print(f"[*] Running start_hostapd('{ssid}') on interface {interface} from Bash script...")
     try:
         subprocess.run(["bash", "start_network.sh", "run_function", "start_hostapd", interface, ssid], check=True)
@@ -81,13 +81,15 @@ def cleanup_hostapd():
         print(f"⚠️ Failed to clean up extra processes: {e}")
 
 atexit.register(cleanup_hostapd)
-atexit.register(enable_managed_mode)
+atexit.register(enable_managed_mode, MY_INTERFACE)
+atexit.register(enable_managed_mode, ADAPTER_INTERFACE)
 
 # טיפול בסיגנלים Ctrl+C או kill
 def handle_signal(sig, frame):
     print(f"\n[!] Caught signal {sig}, cleaning up and exiting...")
     cleanup_hostapd() 
-    enable_managed_mode()
+    enable_managed_mode(MY_INTERFACE)
+    enable_managed_mode(ADAPTER_INTERFACE)
     sys.exit(0)
 
 signal.signal(signal.SIGINT, handle_signal)   # Ctrl+C

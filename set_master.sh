@@ -1,8 +1,7 @@
 #!/bin/bash
 
-INTERFACE="wlp4s0f4u1"
-
 enable_master_mode() {
+    INTERFACE="$1"
 
     if [[ -z "$INTERFACE" ]]; then
         echo "❌ Usage: enable_master_mode <interface>"
@@ -25,4 +24,4 @@ enable_master_mode() {
 }
 
 # Entry point
-enable_master_mode
+enable_master_mode "$1"

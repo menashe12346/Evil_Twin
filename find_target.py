@@ -40,7 +40,7 @@ def channel_hopper(interface, dwell=0.5, stop_event=None):
     t.start()
     return t
 
-def scan_wifi_networks(iface, timeout=100):
+def scan_wifi_networks(iface, timeout=8):
     access_points = {}
     clients = defaultdict(dict)
     parser = manuf.MacParser()

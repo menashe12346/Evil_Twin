@@ -1,8 +1,7 @@
 #!/bin/bash
 
-INTERFACE="wlp2s0"
-
 enable_monitor_mode() {
+    INTERFACE="$1"
 
     if [[ -z "$INTERFACE" ]]; then
         echo "❌ Usage: enable_monitor_mode <interface>"

