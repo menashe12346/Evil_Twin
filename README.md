@@ -6,6 +6,7 @@ This project demonstrates both **offensive** and **defensive** techniques involv
 
 1. **Evil Twin Attack Toolkit**:
    - Sets up a fake Wi-Fi Access Point (AP) with the same SSID as a real one.
+   - Starts a captive portal and DHCP server.
    - Scans for connected clients.
    - Allows targeted *Deauthentication (Deauth)* attacks to disconnect users.
 
@@ -21,53 +22,61 @@ This project demonstrates both **offensive** and **defensive** techniques involv
 ```
 evil_twin/
 ├── attack/
-│   ├── start_attack.py           # Main script to launch Evil Twin + Deauth attack
-│   ├── start_hostapd.sh          # Bash script to configure and run hostapd
-│   ├── hostapd.conf              # Config file for fake AP
-│   ├── set_monitor.sh            # Switches adapter to monitor mode
-│   ├── set_managed.sh            # Restores adapter to managed mode
-│   ├── set_master.sh             # Switches adapter to monitor mode
-│   ├── dhcp_server.sh            # start DHCP server and Captive Portal
-│   └── find_target.py            # Scans and allows user to choose target client
+│   ├── start_attack.py              # Main script to launch Evil Twin + Deauth attack
+│   ├── start_network.sh             # Launch hostapd and captive portal
+│   ├── dhcp_server.py               # DHCP server + HTTP portal
+│   ├── find_target.py               # Scans and selects AP & client
+│   ├── deauthentication_attack.py   # Sends deauth packets
+│   ├── hostapd.conf                 # Config file for fake AP
+│   ├── index.html                   # HTML captive portal page
+│
+├── change_interface_mode/
+│   ├── set_monitor.sh               # Switch adapter to monitor mode
+│   ├── set_master.sh                # Switch adapter to master/AP mode
+│   └── set_managed.sh               # Restore adapter to managed mode
 │
 ├── defense/
-│   └── identify_evil_twin_attack.py  # Real-time background scanner to detect cloned SSIDs
-
-etc
-rquriments.txt
-
+│   └── identify_evil_twin_attack.py # Real-time Evil Twin detection scanner
+│
+├── env/                             # (optional) Python virtual environment
+├── requirements.txt                 # Python dependencies
+└── README.md
 ```
 
 ---
 
 ## ⚙️ Requirements
 
-- Linux OS (tested on Arch)
+- Linux OS (tested on Arch/Ubuntu)
 - Python 3.8+
 - Wi-Fi adapter that supports:
   - Monitor mode
   - AP mode
   - Packet injection
-- `hostapd` installed and accessible
-- Python libraries:
-  ```bash
-  pip install -r requirements.txt
-  ```
-  Contents:
-  ```
-  scapy
-  tabulate
-  manuf
-  ```
+- `hostapd` installed and accessible in PATH
+- Recommended: `airmon-ng`, `iw`, `macchanger`
+
+### 🐍 Python libraries:
+```bash
+pip install -r requirements.txt
+```
+
+`requirements.txt` includes:
+```
+scapy
+tabulate
+manuf
+```
 
 ---
 
 ## 🧪 1. Evil Twin Attack Tool
 
 ### 🧷 Functionality:
-- Sets up fake AP with desired SSID using `hostapd`.
+- Creates a fake access point with a chosen SSID using `hostapd`.
+- Hosts a captive portal and assigns IPs via built-in DHCP.
 - Sniffs nearby clients of real APs.
-- Allows selecting a client and performing a `deauth` attack.
+- Allows selecting a target client and sending deauth frames.
 
 ### ▶️ How to Run
 
@@ -76,24 +85,21 @@ cd attack
 sudo python3 start_attack.py
 ```
 
-You'll be guided through:
-1. Interface selection and switching to monitor/AP mode.
-2. SSID setup.
-3. Scanning for connected clients.
-4. Deauth attack.
-
-### 🔧 Notes:
-- `hostapd.conf` must match your desired settings (will be edited automatically).
-- Use only on authorized networks for testing or lab environments!
+This will:
+1. Set interfaces to the required mode.
+2. Ask you to choose a network and client.
+3. Launch the fake AP.
+4. Start captive portal & DHCP server.
+5. Launch the deauthentication attack.
 
 ---
 
 ## 🛡️ 2. Evil Twin Detection Tool
 
 ### 🧷 Functionality:
-- Constantly scans all Wi-Fi networks.
-- Detects duplicate SSIDs with different BSSIDs or suspicious signal strengths (RSSI).
-- Flags anomalies and prints alerts to the screen.
+- Constantly scans Wi-Fi environment for anomalies.
+- Detects duplicate SSIDs from different BSSIDs (possible clones).
+- Compares RSSI for suspicious signal inconsistencies.
 
 ### ▶️ How to Run
 
@@ -102,41 +108,40 @@ cd defense
 sudo python3 identify_evil_twin_attack.py
 ```
 
-### 🔒 Defense Strategy:
-- Scans every few seconds using `Scapy` in monitor mode.
-- Identifies SSIDs with more than one BSSID.
-- Compares signal strength to detect possible fakes.
-- Future extensions may include:
-  - Automatic deauth of malicious AP.
-  - Logging & notification integration.
+You will see real-time alerts if Evil Twin behavior is detected.
 
 ---
 
 ## 🛠️ Installation & Setup
 
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/menashe12346/evil_twin.git
-   cd evil_twin
-   ```
+1. Clone the repository:
+```bash
+git clone https://github.com/menashe12346/evil_twin.git
+cd evil_twin
+```
 
-2. Install dependencies:
-   ```bash
-   sudo apt install hostapd
-   pip install -r requirements.txt
-   ```
+2. Install system dependencies:
+```bash
+sudo apt install hostapd
+```
 
-3. Make shell scripts executable:
-   ```bash
-   chmod +x attack/*.sh
-   ```
+3. Install Python requirements:
+```bash
+pip install -r requirements.txt
+```
 
-4. Run scripts with `sudo` (due to network interface manipulation).
+4. Make shell scripts executable:
+```bash
+chmod +x change_interface_mode/*.sh
+chmod +x attack/start_network.sh
+```
+
+5. Run scripts with `sudo` due to the need for low-level access to network interfaces.
 
 ---
 
 ## ⚠️ Legal Notice
 
-> ⚠️ **Use responsibly!** This project is for educational purposes and ethical testing in legal environments (e.g., lab, CTF, bug bounty). Do **not** use this toolkit on networks or devices you don't own or have explicit permission to test.
+> ⚠️ **Use responsibly!** This project is intended for ethical hacking, security education, and testing in controlled lab environments. Never use these tools on unauthorized networks or devices. Make sure you have explicit permission.
 
 ---
