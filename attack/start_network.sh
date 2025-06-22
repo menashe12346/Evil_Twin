@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONFIG="hostapd.conf"
+CONFIG="./attack/hostapd.conf"
 PID_FILE="hostapd.pid"
 
 start_hostapd() {
@@ -30,8 +30,7 @@ start_hostapd() {
 
 if [[ "$1" == "run_function" && "$2" == "start_hostapd" ]]; then
     INTERFACE="$3"
-    #SSID="$4 1"
-    SSID="Menashe"
+    SSID="$4"
     start_hostapd "$INTERFACE" "$SSID"
     exit 0
 fi

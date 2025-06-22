@@ -2,6 +2,7 @@ from scapy.all import *
 import subprocess
 import os
 import threading
+import signal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 from datetime import datetime
@@ -15,6 +16,45 @@ LOG_FILE = "logins.txt"
 
 # אחסון sessionים וזיהוי
 session_store = {}
+
+def kill_python_on_port_80():
+    try:
+        # Step 1: Run `sudo lsof -i :80`
+        result = subprocess.run(
+            ['sudo', 'lsof', '-i', ':80'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        output = result.stdout.splitlines()
+
+        # Step 2: Search for lines with "python" processes
+        for line in output:
+            if line.startswith("python"):
+                parts = line.split()
+                pid = int(parts[1])
+                print(f"[+] Found python process with PID {pid} listening on port 80")
+
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    print(f"[+] Sent SIGTERM to PID {pid}")
+                except PermissionError:
+                    print(f"[!] Permission denied to kill PID {pid}")
+                except ProcessLookupError:
+                    print(f"[!] Process {pid} no longer exists")
+                
+                # Optional: Force kill if still alive after short wait
+                import time
+                time.sleep(1)
+                try:
+                    os.kill(pid, 0)  # Check if still alive
+                    os.kill(pid, signal.SIGKILL)
+                    print(f"[+] Sent SIGKILL to PID {pid}")
+                except ProcessLookupError:
+                    print(f"[✓] Process {pid} already terminated")
+
+    except Exception as e:
+        print(f"[!] Error: {e}")
 
 def check_root():
     if os.geteuid() != 0:
@@ -135,6 +175,7 @@ def send_response(mac, xid, chaddr, msg_type="offer"):
 def start_captive_portal(interface):
     global INTERFACE
     INTERFACE = interface
+    kill_python_on_port_80()
     check_root()
     assign_ip_to_ap(interface)
     enable_ip_forwarding()

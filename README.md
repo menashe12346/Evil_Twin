@@ -9,6 +9,8 @@ This project demonstrates both **offensive** and **defensive** techniques involv
    - Starts a captive portal and DHCP server.
    - Scans for connected clients.
    - Allows targeted *Deauthentication (Deauth)* attacks to disconnect users.
+   - Wait for client to reconnect to fake AP
+   - Capture credentials via login portal
 
 2. **Evil Twin Defense Tool**:
    - Monitors nearby Wi-Fi networks in real-time.
@@ -51,24 +53,14 @@ evil_twin/
 - Wi-Fi adapter that supports:
   - Monitor mode
   - AP mode
+  - Packet injection
 - `hostapd` installed and accessible in PATH
-
-### 🐍 Python libraries:
-```bash
-pip install -r requirements.txt
-```
 
 ---
 
-## 🧪 1. Evil Twin Attack Tool
+## ▶️ How to Run
 
-### 🧷 Functionality:
-- Creates a fake access point with a chosen SSID using `hostapd`.
-- Hosts a captive portal and assigns IPs via built-in DHCP.
-- Sniffs nearby clients of real APs.
-- Allows selecting a target client and sending deauth frames.
-
-### ▶️ How to Run
+### 🧪 1. Evil Twin Attack Tool
 
 ```bash
 cd attack
@@ -77,21 +69,15 @@ sudo python start_attack.py
 
 This will:
 1. Set interfaces to the required mode.
-2. Ask you to choose a network and client.
+2. Ask you to choose a network.
 3. Launch the fake AP.
-4. Start captive portal & DHCP server.
-5. Launch the deauthentication attack.
+4. Start captive portal on 192.168.1.1 & DHCP server.
+5. Ask you to choose client to Launch the deauthentication attack on.
+6. Capture credentials via login portal
 
 ---
 
-## 🛡️ 2. Evil Twin Detection Tool
-
-### 🧷 Functionality:
-- Constantly scans Wi-Fi environment for anomalies.
-- Detects duplicate SSIDs from different BSSIDs (possible clones).
-- Compares RSSI for suspicious signal inconsistencies.
-
-### ▶️ How to Run
+### 🛡️ 2. Evil Twin Detection Tool
 
 ```bash
 cd defense

